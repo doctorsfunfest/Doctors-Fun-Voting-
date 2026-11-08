@@ -125,8 +125,12 @@ db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 return db;
 }
 
+
+// PARTICIPANTS AND CODES
+
 const participants=[
 "Dr Omar",
+"Dr Arju",
 "Dr Sonjoy",
 "Dr Saimul",
 "Dr Faruk",
@@ -145,31 +149,39 @@ const participants=[
 "Dr Tamanna",
 "Dr Jerin",
 "Dr Jisan",
-"Dr Pushpita"
+"Dr Pushpita",
+"Dr Ali",
+"Dr Auntu"
 ];
 
 const participantCodes={
 "Dr Omar":"01",
-"Dr Sonjoy":"02",
-"Dr Saimul":"03",
-"Dr Faruk":"04",
-"Dr Jumana":"05",
-"Dr Humayun":"06",
-"Dr Taosiful":"07",
-"Dr Faria":"08",
-"Dr Nahida":"09",
-"Dr Sabeha":"10",
-"Dr Taznim":"11",
-"Dr Sourav":"12",
-"Dr Sadia":"13",
-"Dr Junaed":"14",
-"Dr Abdur Rahman":"15",
-"Dr Tasfia":"16",
-"Dr Tamanna":"17",
-"Dr Jerin":"18",
-"Dr Jisan":"19",
-"Dr Pushpita":"20"
+"Dr Arju":"02",
+"Dr Sonjoy":"03",
+"Dr Saimul":"04",
+"Dr Faruk":"05",
+"Dr Jumana":"06",
+"Dr Humayun":"07",
+"Dr Taosiful":"08",
+"Dr Faria":"09",
+"Dr Nahida":"10",
+"Dr Sabeha":"11",
+"Dr Taznim":"12",
+"Dr Sourav":"13",
+"Dr Sadia":"14",
+"Dr Junaed":"15",
+"Dr Abdur Rahman":"16",
+"Dr Tasfia":"17",
+"Dr Tamanna":"18",
+"Dr Jerin":"19",
+"Dr Jisan":"20",
+"Dr Pushpita":"21",
+"Dr Ali":"22",
+"Dr Auntu":"23"
 };
+
+
+// QUESTIONS
 
 const questions=[
 "If our hospital became a reality TV show, who would be the main character?",
@@ -183,6 +195,9 @@ const questions=[
 "Whose phone call makes everyone nervous?",
 "Who is most likely to say \"I'll be there in 5 minutes\" but arrive after an hour?"
 ];
+
+
+// GLOBAL VARIABLES
 
 let index=0;
 let currentName=null;
@@ -201,7 +216,7 @@ let lotteryRunning=false;
 let lotteryTimer=null;
 
 
-// PARTICIPANT NAME DROPDOWN
+// POPULATE PARTICIPANT DROPDOWN
 
 participants.forEach(n=>{
 document.getElementById("participantName").add(new Option(n,n));
@@ -219,7 +234,7 @@ qr.src="https://api.qrserver.com/v1/create-qr-code/?size=190x190&data="+encodeUR
 document.getElementById("qrcode").appendChild(qr);
 
 
-// LOCAL DRAFT STORAGE
+// SAVE UNFINISHED VOTES IN BROWSER
 
 function draftKey(code){
 return "doctorsFunFestDraft_"+code;
@@ -307,7 +322,7 @@ msg.textContent="Could not connect: "+e.message;
 }
 
 
-// VOTING SCREEN
+// RENDER VOTING QUESTION
 
 function render(){
 
@@ -342,6 +357,8 @@ document.getElementById("message").textContent=
 "Your answers are saved automatically. You can change them until final submission.";
 }
 
+
+// MOVE BETWEEN QUESTIONS
 
 function changeQuestion(n){
 
@@ -597,7 +614,7 @@ html+="<button id='runLotteryBtn' onclick='runLottery()' style='width:100%;backg
 }
 
 
-// Show vote counts after winner is revealed
+// SHOW VOTE BREAKDOWN
 
 if(d.sorted.length){
 
@@ -641,7 +658,7 @@ document.getElementById("results").innerHTML=html;
 }
 
 
-// REVEAL WINNER BUTTON
+// REVEAL WINNER
 
 function revealWinner(){
 
