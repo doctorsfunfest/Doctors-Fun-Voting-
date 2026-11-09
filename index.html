@@ -48,16 +48,13 @@ footer{text-align:center;color:#f3d8ee;padding:20px;font-size:13px}
 </header>
 
 <section class="card" id="entryScreen">
-<h2>🔐 Participant verification</h2>
-<p>Please enter your name and personal code.</p>
+<h2>👋 Welcome!</h2>
+<p>Please select your name to start voting.</p>
 
-<label><b>1. Select your name</b></label>
+<label><b>Select your name</b></label>
 <select id="participantName">
-<option value="">Select your name</option>
+<option value="">Choose your name</option>
 </select>
-
-<label><b>2. Enter your unique code</b></label>
-<input id="participantCode" type="password" inputmode="numeric" maxlength="2" placeholder="Enter your 2-digit code">
 
 <button onclick="verifyParticipant()" style="width:100%">ENTER →</button>
 <p id="entryMessage" class="small"></p>
@@ -100,10 +97,8 @@ footer{text-align:center;color:#f3d8ee;padding:20px;font-size:13px}
 
 <div id="hostControls" class="hidden">
 <p class="small">Load the latest votes and reveal the winners one question at a time.</p>
-
 <button onclick="proclaimWinner()" style="width:100%">🏆 Proclaim Winner</button>
 <button onclick="resetVotes()" style="background:#a52d45;width:100%">Reset all votes</button>
-
 <div id="results"></div>
 </div>
 </section>
@@ -126,11 +121,14 @@ return db;
 }
 
 
-// PARTICIPANTS AND CODES
+// PARTICIPANTS
 
 const participants=[
 "Dr Omar",
+"Dr Ahad",
+"Dr Murad",
 "Dr Arju",
+"Dr Sabbosachi",
 "Dr Sonjoy",
 "Dr Saimul",
 "Dr Faruk",
@@ -154,32 +152,6 @@ const participants=[
 "Dr Auntu"
 ];
 
-const participantCodes={
-"Dr Omar":"01",
-"Dr Arju":"02",
-"Dr Sonjoy":"03",
-"Dr Saimul":"04",
-"Dr Faruk":"05",
-"Dr Jumana":"06",
-"Dr Humayun":"07",
-"Dr Taosiful":"08",
-"Dr Faria":"09",
-"Dr Nahida":"10",
-"Dr Sabeha":"11",
-"Dr Taznim":"12",
-"Dr Sourav":"13",
-"Dr Sadia":"14",
-"Dr Junaed":"15",
-"Dr Abdur Rahman":"16",
-"Dr Tasfia":"17",
-"Dr Tamanna":"18",
-"Dr Jerin":"19",
-"Dr Jisan":"20",
-"Dr Pushpita":"21",
-"Dr Ali":"22",
-"Dr Auntu":"23"
-};
-
 
 // QUESTIONS
 
@@ -201,7 +173,6 @@ const questions=[
 
 let index=0;
 let currentName=null;
-let currentCode=null;
 let answers={};
 
 let unlocked=false;
@@ -216,7 +187,7 @@ let lotteryRunning=false;
 let lotteryTimer=null;
 
 
-// POPULATE PARTICIPANT DROPDOWN
+// POPULATE NAME DROPDOWN
 
 participants.forEach(n=>{
 document.getElementById("participantName").add(new Option(n,n));
@@ -234,15 +205,15 @@ qr.src="https://api.qrserver.com/v1/create-qr-code/?size=190x190&data="+encodeUR
 document.getElementById("qrcode").appendChild(qr);
 
 
-// SAVE UNFINISHED VOTES IN BROWSER
+// LOCAL DRAFT STORAGE
 
-function draftKey(code){
-return "doctorsFunFestDraft_"+code;
+function draftKey(name){
+return "doctorsFunFestDraft_"+name;
 }
 
 function loadDraft(){
 try{
-const saved=localStorage.getItem(draftKey(currentCode));
+const saved=localStorage.getItem(draftKey(currentName));
 if(!saved)return {};
 
 const parsed=JSON.parse(saved);
@@ -261,30 +232,22 @@ return {};
 }
 
 function saveDraft(){
-if(!currentCode)return;
-
+if(!currentName)return;
 try{
-localStorage.setItem(draftKey(currentCode),JSON.stringify(answers));
+localStorage.setItem(draftKey(currentName),JSON.stringify(answers));
 }catch(e){}
 }
 
 
-// VERIFY PARTICIPANT
+// VERIFY PARTICIPANT BY NAME ONLY
 
 async function verifyParticipant(){
 
 const name=document.getElementById("participantName").value;
-const code=document.getElementById("participantCode").value.trim();
 const msg=document.getElementById("entryMessage");
 
-if(!name||!code){
-msg.textContent="Please enter both your name and code.";
-return;
-}
-
-if(participantCodes[name]!==code){
-msg.textContent="Incorrect name or code. Please try again.";
-document.getElementById("participantCode").value="";
+if(!name){
+msg.textContent="Please select your name.";
 return;
 }
 
@@ -295,13 +258,12 @@ try{
 const {data,error}=await getDb().from("game_votes")
 .select("id")
 .eq("question_id","FINAL")
-.eq("voter_id",code)
+.eq("voter_id",name)
 .maybeSingle();
 
 if(error)throw error;
 
 currentName=name;
-currentCode=code;
 
 document.getElementById("entryScreen").classList.add("hidden");
 document.getElementById("votingScreen").classList.remove("hidden");
@@ -361,10 +323,8 @@ document.getElementById("message").textContent=
 // MOVE BETWEEN QUESTIONS
 
 function changeQuestion(n){
-
 index=Math.max(0,Math.min(questions.length-1,index+n));
 render();
-
 }
 
 
@@ -372,9 +332,9 @@ render();
 
 function lockBallot(){
 
-if(currentCode){
+if(currentName){
 try{
-localStorage.removeItem(draftKey(currentCode));
+localStorage.removeItem(draftKey(currentName));
 }catch(e){}
 }
 
@@ -422,14 +382,14 @@ try{
 
 const {error}=await getDb().from("game_votes").insert({
 question_id:"FINAL",
-voter_id:currentCode,
+voter_id:currentName,
 choice:JSON.stringify(answers)
 });
 
 if(error)throw error;
 
 try{
-localStorage.removeItem(draftKey(currentCode));
+localStorage.removeItem(draftKey(currentName));
 }catch(e){}
 
 lockBallot();
@@ -440,7 +400,7 @@ btn.disabled=false;
 
 document.getElementById("message").textContent=
 e.code==="23505"
-?"This code has already submitted a ballot."
+?"This participant has already submitted a ballot."
 :"Submission failed: "+e.message;
 
 }
@@ -454,7 +414,6 @@ function hostLogin(){
 if(document.getElementById("pin").value==="2468"){
 
 unlocked=true;
-
 document.getElementById("hostControls").classList.remove("hidden");
 
 document.getElementById("results").innerHTML=
@@ -491,17 +450,14 @@ ballotRows.forEach(row=>{
 
 try{
 const a=JSON.parse(row.choice);
-
 if(a[i]){
 counts[a[i]]=(counts[a[i]]||0)+1;
 }
-
 }catch(e){}
 
 });
 
 const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-
 const high=sorted.length?sorted[0][1]:0;
 
 const finalists=sorted
@@ -529,21 +485,16 @@ ballotRows=await getBallots();
 
 revealed=true;
 resultIndex=0;
-
 revealedResults={};
 lotteryWinners={};
 
 showCurrentResult();
 
 }catch(e){
-
 alert("Could not load votes: "+e.message);
-
 }finally{
-
 btn.disabled=false;
 btn.textContent="🏆 Proclaim Winner";
-
 }
 
 }
@@ -560,13 +511,8 @@ stopLottery();
 const d=getQuestionData(resultIndex);
 
 let html="<h3>🏆 RESULT "+(resultIndex+1)+" OF "+questions.length+"</h3>";
-
 html+="<div class='result'>";
-
 html+="<h3 class='questionTitle'>"+questions[resultIndex]+"</h3>";
-
-
-// BEFORE REVEAL
 
 if(!revealedResults[resultIndex]){
 
@@ -575,12 +521,7 @@ html+="<p>🤫 The winner is waiting to be revealed!</p>";
 html+="<button onclick='revealWinner()' style='width:100%;background:#d17b20'>🏆 REVEAL WINNER</button>";
 html+="</div>";
 
-}
-
-
-// AFTER REVEAL
-
-else{
+}else{
 
 html+="<p>Votes received: "+d.sorted.reduce((s,x)=>s+x[1],0)+"</p>";
 
@@ -613,9 +554,6 @@ html+="<button id='runLotteryBtn' onclick='runLottery()' style='width:100%;backg
 
 }
 
-
-// SHOW VOTE BREAKDOWN
-
 if(d.sorted.length){
 
 html+="<hr style='border:0;border-top:1px solid #e4d8e9;margin:18px 0'>";
@@ -624,7 +562,6 @@ html+="<h4>Vote breakdown</h4>";
 d.sorted.forEach(([name,count])=>{
 
 html+="<p><b>"+name+"</b> — "+count+" vote(s)</p>";
-
 html+="<div class='bar'><span style='width:"+
 (d.high?100*count/d.high:0)+"%'></span></div>";
 
@@ -636,17 +573,9 @@ html+="<div class='bar'><span style='width:"+
 
 html+="</div>";
 
-
-// PREVIOUS / NEXT NAVIGATION
-
 html+="<div class='resultNav'>";
-
-html+="<button onclick='previousResult()' "+
-(resultIndex===0?"disabled":"")+">← Previous</button>";
-
-html+="<button onclick='nextResult()' "+
-(resultIndex===questions.length-1?"disabled":"")+">Next →</button>";
-
+html+="<button onclick='previousResult()' "+(resultIndex===0?"disabled":"")+">← Previous</button>";
+html+="<button onclick='nextResult()' "+(resultIndex===questions.length-1?"disabled":"")+">Next →</button>";
 html+="</div>";
 
 if(resultIndex===questions.length-1){
@@ -654,7 +583,6 @@ html+="<p style='text-align:center;font-weight:bold'>🎉 All questions complete
 }
 
 document.getElementById("results").innerHTML=html;
-
 }
 
 
@@ -665,7 +593,6 @@ function revealWinner(){
 if(!unlocked)return;
 
 revealedResults[resultIndex]=true;
-
 showCurrentResult();
 
 }
@@ -678,7 +605,6 @@ function runLottery(){
 if(lotteryRunning)return;
 
 const d=getQuestionData(resultIndex);
-
 if(d.finalists.length<2)return;
 
 lotteryRunning=true;
@@ -687,32 +613,23 @@ const btn=document.getElementById("runLotteryBtn");
 const display=document.getElementById("lotteryName");
 
 if(btn)btn.disabled=true;
-
 display.classList.add("spinning");
 
 let ticks=0;
-
 const duration=3500;
 const interval=90;
 
-const winner=d.finalists[
-Math.floor(Math.random()*d.finalists.length)
-];
+const winner=d.finalists[Math.floor(Math.random()*d.finalists.length)];
 
 lotteryTimer=setInterval(()=>{
 
-display.textContent=d.finalists[
-Math.floor(Math.random()*d.finalists.length)
-];
-
+display.textContent=d.finalists[Math.floor(Math.random()*d.finalists.length)];
 ticks+=interval;
 
 if(ticks>=duration){
 
 stopLottery();
-
 lotteryWinners[resultIndex]=winner;
-
 showCurrentResult();
 
 }
@@ -730,7 +647,6 @@ lotteryTimer=null;
 }
 
 lotteryRunning=false;
-
 }
 
 
@@ -739,9 +655,7 @@ lotteryRunning=false;
 function nextResult(){
 
 if(resultIndex>=questions.length-1)return;
-
 resultIndex++;
-
 showCurrentResult();
 
 }
@@ -752,9 +666,7 @@ showCurrentResult();
 function previousResult(){
 
 if(resultIndex<=0)return;
-
 resultIndex--;
-
 showCurrentResult();
 
 }
@@ -781,7 +693,6 @@ if(error)throw error;
 ballotRows=[];
 revealed=false;
 resultIndex=0;
-
 revealedResults={};
 lotteryWinners={};
 
@@ -791,9 +702,7 @@ document.getElementById("results").innerHTML=
 "<p>All votes have been reset. Ready for a new round!</p>";
 
 }catch(e){
-
 alert("Could not reset votes: "+e.message);
-
 }
 
 }
