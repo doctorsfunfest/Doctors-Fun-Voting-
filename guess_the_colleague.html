@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guess the Colleague</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#101827;--panel:#19263a;--panel2:#22334c;--ink:#f4f7fb;--muted:#aebbd0;--accent:#ffc857;--good:#5bd6a2;--bad:#ff7b85}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#243a57 0,#101827 55%);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;padding:24px}
+main{max-width:760px;margin:0 auto}.brand{text-align:center;margin:14px 0 26px}.brand .emoji{font-size:42px}.brand h1{margin:5px 0;font-size:clamp(28px,5vw,42px)}.brand p{margin:0;color:var(--muted)}
+.panel{background:rgba(25,38,58,.96);border:1px solid #344761;border-radius:20px;padding:24px;margin:16px 0;box-shadow:0 14px 40px #0004}
+h2{margin:0 0 14px;font-size:22px}label{display:block;color:var(--muted);font-size:14px;margin:14px 0 6px}
+input,select{width:100%;padding:13px 14px;border-radius:11px;border:1px solid #50627a;background:#101b2b;color:var(--ink);font:inherit}
+input[type=file]{padding:10px}button{border:0;border-radius:12px;padding:13px 18px;background:var(--accent);color:#1b2432;font-weight:800;font-size:15px;cursor:pointer;margin-top:16px}
+button.secondary{background:#344b68;color:var(--ink)}button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row button{flex:1}.muted{color:var(--muted)}.status{padding:12px 14px;border-radius:11px;background:#101b2b;color:var(--muted);margin-top:14px;line-height:1.5}.status.good{color:var(--good)}.status.bad{color:var(--bad)}
+.hidden{display:none!important}.photo-wrap{margin:18px auto 0;max-width:520px;perspective:1000px}.photo-card{position:relative;width:100%;aspect-ratio:4/3;transform-style:preserve-3d;transition:transform .75s ease;border-radius:16px}.photo-card.flipped{transform:rotateY(180deg)}.face{position:absolute;inset:0;backface-visibility:hidden;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0b1421;border:1px solid #4a5c75}.face img{width:100%;height:100%;object-fit:contain}.back{transform:rotateY(180deg);background:linear-gradient(145deg,#314b69,#16283e);flex-direction:column;text-align:center;padding:20px}.back .who{font-size:clamp(26px,6vw,42px);font-weight:900;color:var(--accent);overflow-wrap:anywhere}.round{font-size:14px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+footer{text-align:center;color:#8798b1;font-size:12px;margin:28px 0 8px}
+@media(max-width:520px){body{padding:14px}.panel{padding:18px}}
+</style>
+</head>
+<body>
+<main>
+<header class="brand"><div class="emoji">🕵️‍♀️📸</div><h1>Guess the Colleague</h1><p>One childhood photo. One mystery. Can you guess who?</p></header>
+
+<section id="config" class="panel">
+<h2>Connect the game</h2>
+<p class="muted">Enter your Supabase project details once on this device. The public anon/publishable key is safe to use in a browser when database security is configured with the supplied SQL.</p>
+<label>Supabase project URL</label><input id="projectUrl" value="https://qazenyxlhswckircqtab.supabase.co" placeholder="https://your-project.supabase.co" autocomplete="url">
+<label>Supabase publishable / anon key</label><input id="anonKey" value="sb_publishable_8KPMBVSyf10ltC2ZWxewpg_D0ROZDRN" placeholder="sb_publishable_... or anon key" autocomplete="off">
+<button id="saveConfig">Connect</button>
+<div id="configMsg" class="status">You need to run the accompanying SQL setup in Supabase first and enable Anonymous Sign-Ins.</div>
+</section>
+
+<section id="login" class="panel hidden">
+<h2>Welcome</h2>
+<div class="row"><button id="participantMode" class="secondary">Participant login</button><button id="hostMode" class="secondary">Host login</button></div>
+<div id="participantLogin">
+<label>Your name</label><select id="participantName"><option value="">Select your name</option></select>
+<label>Personal code</label><input id="participantCode" inputmode="numeric" maxlength="2" placeholder="Two-digit code">
+<button id="participantSignIn">Log in</button>
+</div>
+<div id="hostLogin" class="hidden">
+<label>Host PIN</label><input id="hostPin" type="password" inputmode="numeric" placeholder="Host PIN">
+<button id="hostSignIn">Host login</button>
+</div>
+<div id="loginMsg" class="status">Choose participant or host login.</div>
+</section>
+
+<section id="participant" class="panel hidden">
+<h2 id="participantGreeting">Hello!</h2>
+<p class="muted">Upload one childhood photo. Your photo will stay private and will not be visible to you or anyone else in the game until the host starts the game.</p>
+<div id="uploadArea">
+<label>Choose your childhood photo</label><input id="photoFile" type="file" accept="image/jpeg,image/png,image/webp">
+<button id="uploadPhoto">Submit my photo</button>
+</div>
+<div id="participantStatus" class="status">You have not submitted a photo yet.</div>
+<button id="participantLogout" class="secondary">Log out</button>
+</section>
+
+<section id="host" class="panel hidden">
+<h2>Host control room</h2>
+<p class="muted">Photos remain inaccessible until you start the game. The game selects photos randomly without repeats.</p>
+<div id="hostStatus" class="status">Loading submissions…</div>
+<div id="lobbyControls"><button id="startGame" disabled>Start Game</button></div>
+<div id="gameControls" class="hidden">
+<div class="round" id="roundLabel">ROUND 1</div>
+<div class="photo-wrap"><div class="photo-card" id="photoCard">
+<div class="face front"><img id="mysteryPhoto" alt="Mystery childhood photo"></div>
+<div class="face back"><div class="round">This was…</div><div class="who" id="revealedName">?</div></div>
+</div></div>
+<div class="row">
+<button id="revealBtn">Reveal Identity</button>
+<button id="nextBtn" class="secondary" disabled>Next Photo</button>
+</div>
+</div>
+<button id="resetGame" class="secondary hidden">Reset game (host only)</button>
+<button id="hostLogout" class="secondary">Log out</button>
+</section>
+<footer>Private photo uploads · Random selection · No repeated photos</footer>
+</main>
+
+<script>
+(() => {
+const ROSTER = [
+"Dr Omar","Dr Arju","Dr Sonjoy","Dr Saimul","Dr Faruk","Dr Jumana",
+"Dr Humayun","Dr Taosiful","Dr Faria","Dr Nahida","Dr Sabeha","Dr Taznim",
+"Dr Sourav","Dr Sadia","Dr Junaed","Dr Abdur Rahman","Dr Tasfia","Dr Tamanna",
+"Dr Jerin","Dr Jisan","Dr Pushpita","Dr Ali","Dr Auntu"
+];
+const $ = id => document.getElementById(id);
+let supabase = null, participantId = null, currentPhotoId = null, revealed = false;
+const show = (id, yes=true) => $(id).classList.toggle("hidden", !yes);
+function message(id, text, type="") { $(id).textContent=text; $(id).className="status"+(type?" "+type:""); }
+function populateRoster(){ ROSTER.forEach(name=>{const o=document.createElement("option");o.value=name;o.textContent=name;$("participantName").appendChild(o);}); }
+populateRoster();
+
+function connect(url,key){
+ if(!window.supabase){throw new Error("Supabase library did not load. Check your internet connection.");}
+ supabase=window.supabase.createClient(url.replace(/\/+$/,""),key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+}
+$("saveConfig").onclick=async()=>{
+ try{
+  const url=$("projectUrl").value.trim(),key=$("anonKey").value.trim();
+  if(!url||!key) throw new Error("Enter both the project URL and publishable/anon key.");
+  connect(url,key);
+  const {data,error}=await supabase.auth.getSession(); if(error)throw error;
+  show("config",false); show("login",true);
+  if(data.session) await restoreSession();
+ }catch(e){message("configMsg",e.message,"bad");}
+};
+$("participantMode").onclick=()=>{show("participantLogin",true);show("hostLogin",false);};
+$("hostMode").onclick=()=>{show("participantLogin",false);show("hostLogin",true);};
+async function ensureAnonymous(){
+ const {data}=await supabase.auth.getSession();
+ if(!data.session){const {error}=await supabase.auth.signInAnonymously();if(error)throw error;}
+}
+async function participantLogin(){
+ try{
+  await ensureAnonymous();
+  const name=$("participantName").value,code=$("participantCode").value.trim();
+  if(!name||!code)throw new Error("Select your name and enter your two-digit code.");
+  const {data,error}=await supabase.rpc("participant_login",{p_name:name,p_code:code});
+  if(error)throw error;
+  participantId=data.participant_id;
+  await openParticipant(data.name,data.has_submitted);
+ }catch(e){await supabase.auth.signOut();message("loginMsg",e.message,"bad");}
+}
+async function hostLogin(){
+ try{
+  await ensureAnonymous();
+  const pin=$("hostPin").value;
+  const {error}=await supabase.rpc("host_login",{p_pin:pin});if(error)throw error;
+  show("login",false);show("host",true);await refreshHost();
+ }catch(e){await supabase.auth.signOut();message("loginMsg",e.message,"bad");}
+}
+$("participantSignIn").onclick=participantLogin;
+$("hostSignIn").onclick=hostLogin;
+async function openParticipant(name,submitted){
+ show("login",false);show("participant",true);
+ $("participantGreeting").textContent="Hello, "+name+"!";
+ show("uploadArea",!submitted);
+ message("participantStatus",submitted?"Your photo has been submitted successfully. It is hidden until the host starts the game.":"No photo submitted yet.");
+}
+async function restoreSession(){
+ try{
+  const {data,error}=await supabase.rpc("get_my_role");if(error)throw error;
+  if(data.role==="host"){show("config",false);show("login",false);show("host",true);await refreshHost();}
+  else if(data.role==="participant"){participantId=data.participant_id;show("config",false);await openParticipant(data.name,data.has_submitted);}
+ }catch(e){/* no valid game session yet */}
+}
+$("uploadPhoto").onclick=async()=>{
+ try{
+  const file=$("photoFile").files[0];
+  if(!file)throw new Error("Choose a photo first.");
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type))throw new Error("Use a JPG, PNG, or WebP image.");
+  if(file.size>8*1024*1024)throw new Error("Please use an image smaller than 8 MB.");
+  $("uploadPhoto").disabled=true;$("uploadPhoto").textContent="Uploading…";
+  const {data:me,error:meErr}=await supabase.rpc("get_my_role");if(meErr)throw meErr;
+  const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
+  const path=me.participant_id+"/"+crypto.randomUUID()+"."+ext;
+  const {error:upErr}=await supabase.storage.from("childhood-photos").upload(path,file,{upsert:false,contentType:file.type});
+  if(upErr)throw upErr;
+  const {error:regErr}=await supabase.rpc("register_photo",{p_path:path});
+  if(regErr)throw regErr;
+  show("uploadArea",false);
+  message("participantStatus","Your photo has been submitted successfully. It is hidden until the host starts the game.","good");
+ }catch(e){message("participantStatus",e.message,"bad");}
+ finally{$("uploadPhoto").disabled=false;$("uploadPhoto").textContent="Submit my photo";}
+};
+async function refreshHost(){
+ try{
+  const {data,error}=await supabase.rpc("host_status");if(error)throw error;
+  message("hostStatus",`Submissions: ${data.submissions} / 23\nGame status: ${data.state}${data.state==="started"||data.state==="finished"?"\nRounds: "+data.round_no+" / "+data.rounds_total:""}${data.state==="lobby"?"\nAt least 5 submissions are required to start.":""}`);
+  show("lobbyControls",data.state==="lobby");
+  show("gameControls",data.state==="started");
+  show("resetGame",data.state!=="lobby");
+  $("startGame").disabled=data.submissions<5;
+  if(data.state==="finished"){show("gameControls",false);message("hostStatus",`Game finished! ${data.rounds_total} photos were played. You can reset the game to play again.`,"good");show("resetGame",true);}
+ }catch(e){message("hostStatus",e.message,"bad");}
+}
+async function loadNextPhoto(){
+ const {data,error}=await supabase.rpc("host_next_photo");if(error)throw error;
+ if(data.finished){show("gameControls",false);message("hostStatus","All rounds completed. Reset the game if you want to play again.","good");show("resetGame",true);return;}
+ currentPhotoId=data.photo_id;revealed=false;
+ const {data:urlData,error:urlErr}=await supabase.storage.from("childhood-photos").createSignedUrl(data.storage_path,300);
+ if(urlErr)throw urlErr;
+ $("mysteryPhoto").src=urlData.signedUrl;
+ $("photoCard").classList.remove("flipped");
+ $("revealedName").textContent="?";
+ $("roundLabel").textContent=`ROUND ${data.round_no} OF ${data.rounds_total}`;
+ $("revealBtn").disabled=false;$("nextBtn").disabled=true;
+}
+$("startGame").onclick=async()=>{
+ try{
+  $("startGame").disabled=true;
+  const {data,error}=await supabase.rpc("host_start_game");if(error)throw error;
+  show("lobbyControls",false);show("gameControls",true);show("resetGame",false);
+  await loadNextPhoto();await refreshHost();
+ }catch(e){message("hostStatus",e.message,"bad");$("startGame").disabled=false;}
+};
+$("revealBtn").onclick=async()=>{
+ try{
+  const {data,error}=await supabase.rpc("host_reveal_identity");if(error)throw error;
+  $("revealedName").textContent=data.name;
+  $("photoCard").classList.add("flipped");revealed=true;
+  $("revealBtn").disabled=true;$("nextBtn").disabled=false;
+ }catch(e){message("hostStatus",e.message,"bad");}
+};
+$("nextBtn").onclick=async()=>{
+ try{$("nextBtn").disabled=true;await loadNextPhoto();await refreshHost();}
+ catch(e){message("hostStatus",e.message,"bad");}
+};
+$("resetGame").onclick=async()=>{
+ if(!confirm("Reset the game? Submitted photos will remain, and the random rounds will be reshuffled."))return;
+ try{const {error}=await supabase.rpc("host_reset_game");if(error)throw error;
+  $("mysteryPhoto").src="";currentPhotoId=null;await refreshHost();
+ }catch(e){message("hostStatus",e.message,"bad");}
+};
+$("participantLogout").onclick=$("hostLogout").onclick=async()=>{await supabase.auth.signOut();location.reload();};
+})();
+</script>
+</body>
+</html>
