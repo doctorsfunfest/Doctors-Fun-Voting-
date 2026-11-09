@@ -25,12 +25,8 @@ footer{text-align:center;color:#8798b1;font-size:12px;margin:28px 0 8px}
 <header class="brand"><div class="emoji">🕵️‍♀️📸</div><h1>Guess the Colleague</h1><p>One childhood photo. One mystery. Can you guess who?</p></header>
 
 <section id="config" class="panel">
-<h2>Connect the game</h2>
-<p class="muted">Enter your Supabase project details once on this device. The public anon/publishable key is safe to use in a browser when database security is configured with the supplied SQL.</p>
-<label>Supabase project URL</label><input id="projectUrl" value="https://qazenyxlhswckircqtab.supabase.co" placeholder="https://your-project.supabase.co" autocomplete="url">
-<label>Supabase publishable / anon key</label><input id="anonKey" value="sb_publishable_8KPMBVSyf10ltC2ZWxewpg_D0ROZDRN" placeholder="sb_publishable_... or anon key" autocomplete="off">
-<button id="saveConfig">Connect</button>
-<div id="configMsg" class="status">You need to run the accompanying SQL setup in Supabase first and enable Anonymous Sign-Ins.</div>
+<h2>Connecting…</h2>
+<div id="configMsg" class="status">Connecting securely to the game. Please wait.</div>
 </section>
 
 <section id="login" class="panel hidden">
@@ -38,7 +34,6 @@ footer{text-align:center;color:#8798b1;font-size:12px;margin:28px 0 8px}
 <div class="row"><button id="participantMode" class="secondary">Participant login</button><button id="hostMode" class="secondary">Host login</button></div>
 <div id="participantLogin">
 <label>Your name</label><select id="participantName"><option value="">Select your name</option></select>
-<label>Personal code</label><input id="participantCode" inputmode="numeric" maxlength="2" placeholder="Two-digit code">
 <button id="participantSignIn">Log in</button>
 </div>
 <div id="hostLogin" class="hidden">
@@ -82,12 +77,13 @@ footer{text-align:center;color:#8798b1;font-size:12px;margin:28px 0 8px}
 </main>
 
 <script>
-(() => {
+(async () => {
 const ROSTER = [
-"Dr Omar","Dr Arju","Dr Sonjoy","Dr Saimul","Dr Faruk","Dr Jumana",
-"Dr Humayun","Dr Taosiful","Dr Faria","Dr Nahida","Dr Sabeha","Dr Taznim",
-"Dr Sourav","Dr Sadia","Dr Junaed","Dr Abdur Rahman","Dr Tasfia","Dr Tamanna",
-"Dr Jerin","Dr Jisan","Dr Pushpita","Dr Ali","Dr Auntu"
+"Dr Omar","Dr Ahad","Dr Murad","Dr Arju","Dr Sabbosachi","Dr Sonjoy",
+"Dr Saimul","Dr Faruk","Dr Jumana","Dr Humayun","Dr Taosiful","Dr Faria",
+"Dr Nahida","Dr Sabeha","Dr Taznim","Dr Sourav","Dr Sadia","Dr Junaed",
+"Dr Abdur Rahman","Dr Tasfia","Dr Tamanna","Dr Jerin","Dr Jisan","Dr Pushpita",
+"Dr Ali","Dr Auntu"
 ];
 const $ = id => document.getElementById(id);
 let supabase = null, participantId = null, currentPhotoId = null, revealed = false;
@@ -100,16 +96,6 @@ function connect(url,key){
  if(!window.supabase){throw new Error("Supabase library did not load. Check your internet connection.");}
  supabase=window.supabase.createClient(url.replace(/\/+$/,""),key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 }
-$("saveConfig").onclick=async()=>{
- try{
-  const url=$("projectUrl").value.trim(),key=$("anonKey").value.trim();
-  if(!url||!key) throw new Error("Enter both the project URL and publishable/anon key.");
-  connect(url,key);
-  const {data,error}=await supabase.auth.getSession(); if(error)throw error;
-  show("config",false); show("login",true);
-  if(data.session) await restoreSession();
- }catch(e){message("configMsg",e.message,"bad");}
-};
 $("participantMode").onclick=()=>{show("participantLogin",true);show("hostLogin",false);};
 $("hostMode").onclick=()=>{show("participantLogin",false);show("hostLogin",true);};
 async function ensureAnonymous(){
@@ -119,9 +105,9 @@ async function ensureAnonymous(){
 async function participantLogin(){
  try{
   await ensureAnonymous();
-  const name=$("participantName").value,code=$("participantCode").value.trim();
-  if(!name||!code)throw new Error("Select your name and enter your two-digit code.");
-  const {data,error}=await supabase.rpc("participant_login",{p_name:name,p_code:code});
+  const name=$("participantName").value;
+  if(!name)throw new Error("Select your name.");
+  const {data,error}=await supabase.rpc("participant_login",{p_name:name});
   if(error)throw error;
   participantId=data.participant_id;
   await openParticipant(data.name,data.has_submitted);
@@ -172,7 +158,7 @@ $("uploadPhoto").onclick=async()=>{
 async function refreshHost(){
  try{
   const {data,error}=await supabase.rpc("host_status");if(error)throw error;
-  message("hostStatus",`Submissions: ${data.submissions} / 23\nGame status: ${data.state}${data.state==="started"||data.state==="finished"?"\nRounds: "+data.round_no+" / "+data.rounds_total:""}${data.state==="lobby"?"\nAt least 5 submissions are required to start.":""}`);
+  message("hostStatus",`Submissions: ${data.submissions} / 26\nGame status: ${data.state}${data.state==="started"||data.state==="finished"?"\nRounds: "+data.round_no+" / "+data.rounds_total:""}${data.state==="lobby"?"\nAt least 5 submissions are required to start.":""}`);
   show("lobbyControls",data.state==="lobby");
   show("gameControls",data.state==="started");
   show("resetGame",data.state!=="lobby");
@@ -219,6 +205,19 @@ $("resetGame").onclick=async()=>{
  }catch(e){message("hostStatus",e.message,"bad");}
 };
 $("participantLogout").onclick=$("hostLogout").onclick=async()=>{await supabase.auth.signOut();location.reload();};
+
+// Connect automatically; participants do not need to enter project credentials.
+try {
+  connect("https://qazenyxlhswckircqtab.supabase.co",
+          "sb_publishable_8KPMBVSyf10ltC2ZWxewpg_D0ROZDRN");
+  const {data,error}=await supabase.auth.getSession();
+  if(error) throw error;
+  show("config",false);
+  show("login",true);
+  if(data.session) await restoreSession();
+} catch(e) {
+  message("configMsg","Could not connect: "+e.message+" — check Supabase setup and Anonymous Sign-Ins.","bad");
+} 
 })();
 </script>
 </body>
